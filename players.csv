@@ -1,0 +1,29 @@
+PlayerID,Name,Team,Position,Shooting,Passing,Dribbling,Defending,Goalkeeping,PlayStyle
+1,Victor Osimhen,Galatasaray,FW,85,79,73,64,0,Defensive
+2,Mauro Icardi,Galatasaray,FW,67,79,57,74,0,Creative
+3,Hakim Ziyech,Galatasaray,MF,61,68,84,82,0,Balanced
+4,Kerem Aktürkoğlu,Galatasaray,MF,67,74,68,83,0,Balanced
+5,Fernando Muslera,Galatasaray,GK,0,30,33,51,84,Creative
+6,Barış Alper Yılmaz,Galatasaray,DF,44,76,57,91,0,Balanced
+7,Davinson Sánchez,Galatasaray,DF,49,69,58,93,0,Balanced
+8,Edin Džeko,Fenerbahçe,FW,65,79,57,88,0,Aggressive
+9,Dušan Tadić,Fenerbahçe,MF,64,79,87,56,0,Defensive
+10,Joshua King,Fenerbahçe,FW,57,70,89,76,0,Defensive
+11,İrfan Kahveci,Fenerbahçe,MF,84,51,61,65,0,Defensive
+12,Dominik Livaković,Fenerbahçe,GK,0,39,22,60,88,Creative
+13,Bright Osayi-Samuel,Fenerbahçe,DF,56,74,67,86,0,Defensive
+14,Çağlar Söyüncü,Fenerbahçe,DF,37,79,52,92,0,Aggressive
+15,Cenk Tosun,Beşiktaş,FW,83,85,86,90,0,Creative
+16,Alex Oxlade-Chamberlain,Beşiktaş,MF,77,57,65,68,0,Defensive
+17,Rachid Ghezzal,Beşiktaş,MF,67,69,50,55,0,Creative
+18,Gedson Fernandes,Beşiktaş,MF,79,85,83,78,0,Defensive
+19,Mert Günok,Beşiktaş,GK,0,50,35,58,89,Balanced
+20,Necip Uysal,Beşiktaş,DF,40,73,40,75,0,Balanced
+21,Omar Colley,Beşiktaş,DF,37,78,58,93,0,Balanced
+22,Paul Onuachu,Trabzonspor,FW,50,89,90,57,0,Defensive
+23,Mahmoud Trézéguet,Trabzonspor,MF,65,86,84,62,0,Balanced
+24,Edin Višća,Trabzonspor,MF,64,60,64,73,0,Defensive
+25,Anastasios Bakasetas,Trabzonspor,MF,84,53,52,72,0,Creative
+26,Uğurcan Çakır,Trabzonspor,GK,0,38,29,60,83,Defensive
+27,Jens Stryger Larsen,Trabzonspor,DF,34,69,70,80,0,Aggressive
+28,Stefano Denswil,Trabzonspor,DF,60,77,40,71,0,Defensive
