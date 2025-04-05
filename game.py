@@ -2,20 +2,20 @@ import random
 import csv
 from team import Team
 from player import Player
+from ball import Ball
 
 
 class Game:
     def __init__(self, team1_name, team2_name, csv_file="players.csv"):
-        self.team1 = Team(team1_name)
-        self.team2 = Team(team2_name)
+        self.team1 = Team(team1_name)  # Defends 1st Side
+        self.team2 = Team(team2_name)  # Defends 2nd Side
         self.load_players(csv_file)
         self.current_tick = 0
         self.max_ticks = 90
-        self.ball_team = None
-        self.ball_player = None
-        self.sectors = ["Midfield 1st Side", "Midfield 2nd Side", "1st Side Close to Goal",
-                        "1st Side Penalty Area", "2nd Side Close to Goal", "2nd Side Penalty Area"]
-        self.current_sector = None
+        self.ball = Ball(["Midfield 1st Side", "Midfield 2nd Side", "1st Side Close to Goal",
+                          "1st Side Penalty Area", "2nd Side Close to Goal", "2nd Side Penalty Area"])
+        self.sectors = self.ball.sectors  # Alias for convenience
+        self.half_time = False
 
     def load_players(self, csv_file):
         with open(csv_file, "r", encoding="utf-8") as file:
@@ -29,76 +29,205 @@ class Game:
                 elif player.team_name == self.team2.name:
                     self.team2.add_player(player)
 
-        print(f"Team 1 ({self.team1.name}) players: {len(self.team1.players)}")
-        for p in self.team1.players:
-            print(f"  {p.name}, {p.position}")
-        print(f"Team 2 ({self.team2.name}) players: {len(self.team2.players)}")
-        for p in self.team2.players:
-            print(f"  {p.name}, {p.position}")
+        print(f"Team 1 ({self.team1.name}) active players: {len(self.team1.active_players)}")
+        for p in self.team1.active_players:
+            print(f"  {p}")
+        print(f"Team 2 ({self.team2.name}) active players: {len(self.team2.active_players)}")
+        for p in self.team2.active_players:
+            print(f"  {p}")
 
     def start_game(self):
-        self.ball_team = random.choice([self.team1, self.team2])
-        self.ball_player = self.ball_team.get_player_by_position("MF")
-        if self.ball_player is None:
-            print(f"Warning: No midfielder found for {self.ball_team.name}. Selecting a random player.")
-            self.ball_player = random.choice(self.ball_team.players) if self.ball_team.players else None
-        if self.ball_player is None:
-            raise ValueError(f"No players available for {self.ball_team.name}. Check CSV data.")
-        self.current_sector = "Midfield 1st Side" if self.ball_team == self.team1 else "Midfield 2nd Side"
-        print(f"Game starts! {self.ball_team.name} kicks off with {self.ball_player.name}.")
+        kickoff_team = random.choice([self.team1, self.team2])
+        kickoff_player = kickoff_team.get_player_by_position("MF") or random.choice(kickoff_team.active_players)
+        self.ball.set_possession(kickoff_team, kickoff_player,
+                                 "Midfield 1st Side" if kickoff_team == self.team1 else "Midfield 2nd Side")
+        print(
+            f"Game starts! {self.ball.team.name} kicks off from {self.ball.current_sector} with {self.ball.player.name}.")
 
-    def update_sector(self, action, outcome):
-        current_idx = self.sectors.index(self.current_sector)
-        direction = 1 if self.ball_team == self.team2 else -1
+    def update_sector(self, action, outcome, direction):
+        current_idx = self.sectors.index(self.ball.current_sector)
         if action == "Dribble" and "Advances" in outcome:
-            self.current_sector = self.sectors[max(0, min(len(self.sectors) - 1, current_idx + direction))]
+            new_idx = max(0, min(len(self.sectors) - 1, current_idx + direction * 2))
+            if direction == 1 and current_idx >= 2:  # Fenerbahçe attacking 1st Side
+                new_idx = min(3, new_idx)
+            elif direction == -1 and current_idx <= 3:  # Galatasaray attacking 2nd Side
+                new_idx = max(4, new_idx)
+            self.ball.current_sector = self.sectors[new_idx]
         elif action == "Long Pass" and "reaches" in outcome:
-            self.current_sector = self.sectors[max(0, min(len(self.sectors) - 1, current_idx + 2 * direction))]
-        elif "Goal" in outcome or "Out" in outcome or "Corner" in outcome:
-            self.current_sector = random.choice(["Midfield 1st Side", "Midfield 2nd Side"])
+            new_idx = max(0, min(len(self.sectors) - 1, current_idx + direction * 3))
+            self.ball.current_sector = self.sectors[new_idx]
+
+    def handle_out_of_bounds(self, last_team):
+        if "Penalty" in self.ball.current_sector or "Close to Goal" in self.ball.current_sector:
+            if (last_team == self.team1 and "1st Side" in self.ball.current_sector) or (
+                    last_team == self.team2 and "2nd Side" in self.ball.current_sector):
+                self.ball.team = self.team2 if "1st Side" in self.ball.current_sector else self.team1
+                self.ball.player = self.ball.team.get_player_by_position("GK")
+                self.ball.current_sector = "1st Side Penalty Area" if self.ball.team == self.team1 else "2nd Side Penalty Area"
+                self.ball.possessed = True
+                print(
+                    f"Goal kick! {self.ball.team.name}'s {self.ball.player.name} restarts from {self.ball.current_sector}.")
+            else:
+                self.ball.team = self.team1 if "1st Side" in self.ball.current_sector else self.team2
+                self.ball.player = self.ball.team.get_player_by_position("MF") or random.choice(
+                    self.ball.team.active_players)
+                self.ball.current_sector = "1st Side Penalty Area" if self.ball.team == self.team1 else "2nd Side Penalty Area"
+                self.ball.possessed = True
+                print(
+                    f"Corner kick! {self.ball.team.name}'s {self.ball.player.name} takes it from {self.ball.current_sector}.")
+        else:
+            self.ball.team = self.team2 if last_team == self.team1 else self.team1
+            self.ball.player = self.ball.team.get_player_by_position("DF") or random.choice(
+                self.ball.team.active_players)
+            self.ball.possessed = True
+            print(
+                f"Throw-in! {self.ball.team.name}'s {self.ball.player.name} takes it from {self.ball.current_sector}.")
+
+    def move_players(self):
+        ball_idx = self.sectors.index(self.ball.current_sector)
+        for player in self.team1.active_players + self.team2.active_players:
+            if player == self.ball.player:  # Ball possessor stays with the ball
+                player.current_sector = self.ball.current_sector
+                continue
+            current_idx = self.sectors.index(player.current_sector)
+            target_idx = ball_idx
+            direction = -1 if player.team_name == self.team1.name else 1
+
+            if self.ball.possessed and self.ball.team is not None:  # Ball is possessed
+                if player.team_name == self.ball.team.name:  # Teammates
+                    if player.position == "FW":
+                        target_idx = ball_idx + direction * 2  # Push toward opponent’s goal
+                    elif player.position == "MF":
+                        target_idx = ball_idx  # Stay near ball
+                    elif player.position == "DF":
+                        target_idx = ball_idx - direction * 1  # Stay slightly back
+                    elif player.position == "GK":
+                        target_idx = 3 if player.team_name == "Galatasaray" else 5  # Own penalty area
+                else:  # Opponents
+                    if player.position == "FW":
+                        target_idx = ball_idx + direction * 1  # Chase the ball
+                    elif player.position == "MF":
+                        target_idx = ball_idx  # Mark the ball
+                    elif player.position == "DF" or player.position == "GK":
+                        target_idx = 3 if player.team_name == "Fenerbahçe" else 5  # Defend goal
+            else:  # Ball is loose or uninitialized
+                if player.position == "FW" or player.position == "MF":
+                    target_idx = ball_idx  # Move toward loose ball
+                elif player.position == "DF":
+                    target_idx = ball_idx - direction * 1  # Stay slightly back
+                elif player.position == "GK":
+                    target_idx = 3 if player.team_name == "Galatasaray" else 5  # Stay in goal
+
+            target_idx = max(0, min(len(self.sectors) - 1, target_idx))
+            if random.random() < 0.5 and current_idx != target_idx:  # 50% chance to move
+                step = 1 if target_idx > current_idx else -1
+                player.current_sector = self.sectors[current_idx + step]
 
     def simulate_tick(self):
-        opponent_team = self.team2 if self.ball_team == self.team1 else self.team1
-        opponent = (opponent_team.get_player_by_position("DF") if "Penalty" not in self.current_sector
-                    else opponent_team.get_player_by_position("GK"))
+        if self.current_tick == 45 and not self.half_time:
+            print("\nHalf Time! Teams head to the locker room.")
+            self.half_time = True
+            kickoff_team = random.choice([self.team1, self.team2])
+            kickoff_player = kickoff_team.get_player_by_position("MF") or random.choice(kickoff_team.active_players)
+            self.ball.set_possession(kickoff_team, kickoff_player,
+                                     "Midfield 1st Side" if kickoff_team == self.team1 else "Midfield 2nd Side")
+            print(
+                f"Second half starts! {self.ball.team.name} kicks off from {self.ball.current_sector} with {self.ball.player.name}.")
+            return
 
-        if opponent is None:
-            position_needed = "DF" if "Penalty" not in self.current_sector else "GK"
-            print(f"Warning: No {position_needed} found for {opponent_team.name}. Selecting a random player.")
-            opponent = random.choice(opponent_team.players)
+        self.move_players()
 
-        action, outcome, odds, roll = self.ball_player.perform_action(opponent, self.current_sector, is_defending=False)
-        print(
-            f"Tick {self.current_tick}: {self.ball_player.name} ({self.ball_team.name}) attempts to {action.lower()} in {self.current_sector}")
-        print(f"Success Odds: {odds}% | Roll: {roll} | Outcome: {outcome}")
+        if not self.ball.possessed:
+            self.ball.team = random.choice([self.team1, self.team2])
+            self.ball.player = self.ball.team.get_player_by_position("MF") or random.choice(
+                self.ball.team.active_players)
+            opponent_team = self.team2 if self.ball.team == self.team1 else self.team1
+            opponent = opponent_team.get_player_by_position("DF") or random.choice(opponent_team.active_players)
 
-        if "Goal" in outcome:
-            self.ball_team.score += 1
-            self.ball_team = opponent_team
-            self.ball_player = self.ball_team.get_player_by_position("MF") or random.choice(self.ball_team.players)
-        elif "Intercepted" in outcome or "Tackled" in outcome:
-            self.ball_team = opponent_team
-            self.ball_player = opponent
-            def_action, def_outcome, def_odds, def_roll = opponent.perform_action(self.ball_player, self.current_sector,
-                                                                                  is_defending=True)
-            print(f"  {opponent.name} ({opponent_team.name}) counters with {def_action.lower()}:")
-            print(f"  Success Odds: {def_odds}% | Roll: {def_roll} | Outcome: {def_outcome}")
-            if "Ball won" in def_outcome:
-                self.ball_player = opponent
-            elif "Foul" in def_outcome:
-                self.ball_player = self.ball_team.get_player_by_position("MF") or random.choice(self.ball_team.players)
-        elif "reaches" in outcome or "passed" in outcome:
-            self.ball_player = self.ball_team.get_player_by_position(
-                "FW" if "reaches" in outcome else "MF") or random.choice(self.ball_team.players)
+            action, outcome, odds, roll = self.ball.player.perform_action(opponent, self.ball.current_sector,
+                                                                          ball_loose=True)
+            print(
+                f"Tick {self.current_tick}: {self.ball.player.name} ({self.ball.team.name}) attempts to {action.lower()} in {self.ball.current_sector}")
+            print(f"Success Odds: {odds}% | Roll: {roll} | Outcome: {outcome}")
 
-        self.update_sector(action, outcome)
+            if "controlled" in outcome:
+                self.ball.possessed = True
+        else:
+            opponent_team = self.team2 if self.ball.team == self.team1 else self.team1
+            if "1st Side Penalty Area" in self.ball.current_sector:
+                opponent = self.team1.get_player_by_position(
+                    "GK") if self.ball.team == self.team2 else opponent_team.get_player_by_position("DF")
+            elif "2nd Side Penalty Area" in self.ball.current_sector:
+                opponent = self.team2.get_player_by_position(
+                    "GK") if self.ball.team == self.team1 else opponent_team.get_player_by_position("DF")
+            else:
+                opponent = opponent_team.get_player_by_position("DF") or random.choice(opponent_team.active_players)
+            opponent = opponent or random.choice(opponent_team.active_players)
+
+            action, outcome, odds, roll = self.ball.player.perform_action(opponent, self.ball.current_sector)
+            print(
+                f"Tick {self.current_tick}: {self.ball.player.name} ({self.ball.team.name}) attempts to {action.lower()} in {self.ball.current_sector}")
+            print(f"Success Odds: {odds}% | Roll: {roll} | Outcome: {outcome}")
+
+            direction = -1 if self.ball.team == self.team1 else 1
+            if "Goal" in outcome:
+                self.ball.team.score += 1
+                kickoff_team = opponent_team
+                self.ball.set_possession(kickoff_team, kickoff_team.get_player_by_position("MF") or random.choice(
+                    kickoff_team.active_players),
+                                         "Midfield 1st Side" if kickoff_team == self.team1 else "Midfield 2nd Side")
+                print(
+                    f"Goal! {self.ball.team.name} will restart from {self.ball.current_sector} with {self.ball.player.name}.")
+            elif "Intercepted" in outcome or "Tackled" in outcome:
+                self.ball.team = opponent_team
+                self.ball.player = opponent
+                def_action, def_outcome, def_odds, def_roll = opponent.perform_action(self.ball.player,
+                                                                                      self.ball.current_sector,
+                                                                                      is_defending=True)
+                print(f"  {opponent.name} ({opponent_team.name}) counters with {def_action.lower()}:")
+                print(f"  Success Odds: {def_odds}% | Roll: {def_roll} | Outcome: {def_outcome}")
+                if "Ball won" in def_outcome:
+                    self.ball.player = opponent
+                elif "Foul" in def_outcome:
+                    if opponent.red_card:
+                        opponent_team.active_players.remove(opponent)
+                        print(
+                            f"{opponent.name} sent off! {opponent_team.name} down to {len(opponent_team.active_players)} players.")
+                    self.ball.set_loose(self.ball.current_sector)
+            elif "Out" in outcome:
+                self.handle_out_of_bounds(self.ball.team)
+            elif "Saved and out for corner" in outcome:
+                self.ball.team = self.ball.team  # Attacking team keeps possession
+                self.ball.player = self.ball.team.get_player_by_position("MF") or random.choice(
+                    self.ball.team.active_players)
+                self.ball.current_sector = "2nd Side Penalty Area" if self.ball.team == self.team1 else "1st Side Penalty Area"
+                self.ball.possessed = True
+                print(
+                    f"Corner kick! {self.ball.team.name}'s {self.ball.player.name} takes it from {self.ball.current_sector}.")
+            elif "reaches" in outcome:
+                self.ball.player = self.ball.team.get_player_by_position("FW") or random.choice(
+                    self.ball.team.active_players)
+                print(f"  Ball reaches {self.ball.player.name}.")
+            elif "passed" in outcome:
+                nearby_players = [p for p in self.ball.team.active_players if
+                                  abs(self.sectors.index(p.current_sector) - self.sectors.index(
+                                      self.ball.current_sector)) <= 2 and p != self.ball.player]
+                self.ball.player = random.choice(nearby_players) if nearby_players else random.choice(
+                    self.ball.team.active_players)
+                print(f"  Ball passed to {self.ball.player.name}.")
+
+            self.update_sector(action, outcome, direction)
+
+        if self.ball.player and self.ball.player.fatigue > 80 and random.random() < 0.3:
+            self.ball.player = self.ball.team.substitute_player(self.ball.player)
 
     def run_game(self):
         self.start_game()
         for tick in range(1, self.max_ticks + 1):
             self.current_tick = tick
             self.simulate_tick()
-        print(f"\nFinal Score: {self.team1} - {self.team2}")
+        print("\nFinal Whistle! Match ends.")
+        print(f"Final Score: {self.team1} - {self.team2}")
 
 
 if __name__ == "__main__":
